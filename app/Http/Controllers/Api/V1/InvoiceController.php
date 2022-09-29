@@ -1,11 +1,16 @@
 <?php
 
-namespace App\Http\Controllers;
+namespace App\Http\Controllers\Api\V1;
 
 use App\Models\Invoice;
-use App\Http\Requests\StoreInvoiceRequest;
+use Illuminate\Support\Arr;
+use Illuminate\Http\Request;
+use App\Filters\V1\InvoicesFilter;
+use App\Http\Controllers\Controller;
+use App\Http\Resources\V1\InvoiceResource;
 use App\Http\Requests\UpdateInvoiceRequest;
-
+use App\Http\Resources\V1\InvoiceCollection;
+use App\Http\Requests\BulkStoreInvoiceRequest;
 class InvoiceController extends Controller
 {
     /**
@@ -13,9 +18,17 @@ class InvoiceController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
-    public function index()
+    public function index(Request $request)
     {
-        //
+        $filter = new InvoicesFilter();
+        $queryItems = $filter->transform($request); // [['column','operator','value']]
+        if (count($queryItems) == 0) {
+            return new InvoiceCollection(Invoice::paginate());
+        } else {
+            $invoices = Invoice::where($queryItems)->paginate();
+            return new InvoiceCollection($invoices->appends($request->query()));
+        }
+        Invoice::where($queryItems);
     }
 
     /**
@@ -34,11 +47,23 @@ class InvoiceController extends Controller
      * @param  \App\Http\Requests\StoreInvoiceRequest  $request
      * @return \Illuminate\Http\Response
      */
-    public function store(StoreInvoiceRequest $request)
+    public function store(Request $request)
     {
         //
     }
 
+    /**
+     * BulkStore Store a newly created resource in storage.
+     *
+     * @param  $request
+     * @return \Illuminate\Http\Response
+     */
+    public function bulkStore(BulkStoreInvoiceRequest $request){
+        $bulk = collect($request->all())->map(function($arr,$key){
+           return Arr::except($arr,['customerId','billedDate','paidDate']);
+        });
+        return Invoice::insert($bulk->toArray());
+    }
     /**
      * Display the specified resource.
      *
@@ -48,6 +73,7 @@ class InvoiceController extends Controller
     public function show(Invoice $invoice)
     {
         //
+        return new InvoiceResource($invoice);
     }
 
     /**
